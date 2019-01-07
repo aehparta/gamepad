@@ -9,6 +9,7 @@
 #include <libe/comm.h>
 #include <libe/os.h>
 #include "gdd.h"
+#include "cmd.h"
 
 
 static const char opts[] = COMMON_SHORT_OPTS "o:";
