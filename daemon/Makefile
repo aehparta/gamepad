@@ -20,7 +20,6 @@ BUILD_LIBS = libe
 CFLAGS += -D_GNU_SOURCE $(libe_CFLAGS)
 LDFLAGS += $(libe_LDFLAGS)
 
-include $(LIBE_PATH)/cc.mk
 $(info libe sources: $(libe_SRC))
 $(info libe use: $(libe_USE))
 $(info cflags: $(CFLAGS))
