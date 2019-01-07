@@ -5,10 +5,9 @@
  *  Antti Partanen <aehparta@iki.fi>
  */
 
-#include <lib/debug.h>
-#include <lib/packet.h>
-#include <lib/comm.h>
-#include <lib/os.h>
+#include <libe/debug.h>
+#include <libe/comm.h>
+#include <libe/os.h>
 #include "gdd.h"
 
 
@@ -100,40 +99,40 @@ int main(int argc, char *argv[])
 	/* program loop */
 	DEBUG_MSG("starting main program loop");
 	while (1) {
-		struct packet pck;
-		int ok = comm_recv(&pck, sizeof(pck));
-		if (ok < 0) {
-			CRIT_MSG("device disconnected?");
-			break;
-		} else if (ok > 0 && pck.mode == PACKET_MODE_BROADCAST && pck.type == PACKET_TYPE_GAMEPAD) {
-			int found = 0;
-			for (int i = 0; i < 32; i++) {
-				if (PTOH24(pck.rid) == message_ids[i]) {
-					found = 1;
-					break;
-				}
-			}
-			if (found) {
-				continue;
-			}
-			message_ids[messagebuffer_cursor] = PTOH24(pck.rid);
-			messagebuffer_cursor = (messagebuffer_cursor + 1) % 32;
+		// struct packet pck;
+		// int ok = comm_recv(&pck, sizeof(pck));
+		// if (ok < 0) {
+		// 	CRIT_MSG("device disconnected?");
+		// 	break;
+		// } else if (ok > 0 && pck.mode == PACKET_MODE_BROADCAST && pck.type == PACKET_TYPE_GAMEPAD) {
+		// 	int found = 0;
+		// 	for (int i = 0; i < 32; i++) {
+		// 		if (PTOH24(pck.rid) == message_ids[i]) {
+		// 			found = 1;
+		// 			break;
+		// 		}
+		// 	}
+		// 	if (found) {
+		// 		continue;
+		// 	}
+		// 	message_ids[messagebuffer_cursor] = PTOH24(pck.rid);
+		// 	messagebuffer_cursor = (messagebuffer_cursor + 1) % 32;
 
-			struct gdd *gdd = gdd_create(PTOH24(pck.from), 0);
-			if (gdd) {
-				gdd_set_buttons(gdd, pck.gamepad.buttons[0]);
-			}
+		// 	struct gdd *gdd = gdd_create(PTOH24(pck.from), 0);
+		// 	if (gdd) {
+		// 		gdd_set_buttons(gdd, pck.gamepad.buttons[0]);
+		// 	}
 
-			/* data received */
-			printf("%s%6ld -> %6ld, fw: %6ld, mode: %d, type: %3d, id: %10ld, buttons: %04x%s\r\n",
-			       pck.mode == 2 ? LDC_WHITEB LDC_BBLUE : LDC_WHITEB LDC_BCYAN,
-			       (long int)PTOH24(pck.from), (long int)PTOH24(pck.to),
-			       (long int)PTOH24(pck.fw),
-			       (int)pck.mode, (int)pck.type,
-			       (long int)PTOH24(pck.rid),
-			       pck.gamepad.buttons[0],
-			       LDC_DEFAULT);
-		}
+		// 	/* data received */
+		// 	printf("%s%6ld -> %6ld, fw: %6ld, mode: %d, type: %3d, id: %10ld, buttons: %04x%s\r\n",
+		// 	       pck.mode == 2 ? LDC_WHITEB LDC_BBLUE : LDC_WHITEB LDC_BCYAN,
+		// 	       (long int)PTOH24(pck.from), (long int)PTOH24(pck.to),
+		// 	       (long int)PTOH24(pck.fw),
+		// 	       (int)pck.mode, (int)pck.type,
+		// 	       (long int)PTOH24(pck.rid),
+		// 	       pck.gamepad.buttons[0],
+		// 	       LDC_DEFAULT);
+		// }
 
 		/* lets not waste all cpu */
 		os_sleepf(0.001);

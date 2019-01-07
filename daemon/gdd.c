@@ -12,8 +12,8 @@
 #include <fcntl.h>
 #include <string.h>
 #include <linux/uinput.h>
-#include <lib/debug.h>
-#include <lib/linkedlist.h>
+#include <libe/debug.h>
+#include <libe/linkedlist.h>
 #include "gdd.h"
 
 

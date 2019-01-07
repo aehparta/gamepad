@@ -5,10 +5,7 @@
 			"path": "."
 		},
     {
-      "path": "../lib"
-    },
-    {
-      "path": "../device"
+      "path": "../libe"
     }
 	]
 }
