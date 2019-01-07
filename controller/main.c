@@ -1,55 +1,27 @@
 /*
- * Gamepad daemon
+ * Kotivo device: keypad remote controller
  *
  * Authors:
  *  Antti Partanen <aehparta@iki.fi>
  */
 
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <math.h>
+#include <libe/os.h>
 #include <libe/debug.h>
 #include <libe/nrf.h>
-#include <libe/os.h>
-#include "gdd.h"
-#include "cmd.h"
-#include "../config.h"
+#ifdef TARGET_ESP32
+#include <freertos/task.h>
+#endif
 #include "../gamepad.h"
+#include "../config.h"
 
 
 struct spi_master master;
 struct nrf_device nrf;
 
-static const char opts[] = COMMON_SHORT_OPTS;
-static struct option longopts[] = {
-	COMMON_LONG_OPTS
-	{ 0, 0, 0, 0 },
-};
-
-int p_options(int c, char *optarg)
-{
-	switch (c) {
-	}
-	return 0;
-}
-
-void p_help(void)
-{
-	printf(
-	    "\n"
-	    "Gamepad daemon that creates input devices for controller devices found from network.\n"
-	    "\n");
-}
-
-void sig_catch_int(int signum)
-{
-	signal(signum, sig_catch_int);
-	INFO_MSG("SIGINT/SIGTERM (CTRL-C?) caught, exit application");
-	p_exit(EXIT_FAILURE);
-}
-
-void sig_catch_tstp(int signum)
-{
-	signal(signum, sig_catch_tstp);
-	WARN_MSG("SIGTSTP (CTRL-Z?) caught, don't do that");
-}
 
 void p_exit(int return_code)
 {
@@ -59,7 +31,6 @@ void p_exit(int return_code)
 		exit(return_code);
 	}
 	nrf_disable_radio(&nrf);
-	gdd_quit();
 	spi_master_close(&master);
 	log_quit();
 	os_quit();
@@ -73,20 +44,10 @@ int p_init(int argc, char *argv[])
 	/* debug/log init */
 	log_init(NULL, 0);
 
-	/* parse command line options */
-	if (common_options(argc, argv, opts, longopts)) {
-		ERROR_MSG("invalid command line option(s)");
-		p_exit(EXIT_FAILURE);
-	}
-	/* signal handlers */
-	signal(SIGINT, sig_catch_int);
-	signal(SIGTERM, sig_catch_int);
-	signal(SIGTSTP, sig_catch_tstp);
-
 	/* initialize spi master */
 #ifdef USE_FTDI
 	/* open ft232h type device and try to see if it has a nrf24l01+ connected to it through mpsse-spi */
-	struct ftdi_context *context = common_ftdi_init();
+	struct ftdi_context *context = ftdi_open(0x0403, 0x6014, 0, NULL, NULL, 1);
 #else
 	void *context = CFG_SPI_CONTEXT;
 #endif
@@ -110,13 +71,14 @@ int p_init(int argc, char *argv[])
 	nrf_flush_rx(&nrf);
 	nrf_enable_radio(&nrf);
 
-	/* gamepad daemon devices */
-	gdd_init();
-
 	return 0;
 }
 
+#ifdef TARGET_ESP32
+int app_main(int argc, char *argv[])
+#else
 int main(int argc, char *argv[])
+#endif
 {
 	/* init */
 	if (p_init(argc, argv)) {
@@ -124,27 +86,52 @@ int main(int argc, char *argv[])
 		p_exit(EXIT_FAILURE);
 	}
 
-	/* program loop */
-	INFO_MSG("starting main program loop");
-	while (1) {
-		struct gamepad_packet pck;
-		int ok;
+	/* init nes controller */
+	os_gpio_output(15); /* clock */
+	os_gpio_low(15);
+	os_gpio_output(2); /* latch */
+	os_gpio_low(2);
+	os_gpio_input(4); /* data */
+	gpio_set_pull_mode(4, GPIO_PULLUP_ONLY);
 
-		ok = nrf_recv(&nrf, &pck);
-		if (ok < 0) {
-			CRIT_MSG("device disconnected?");
-			break;
-		} else if (ok > 0 && memcmp(pck.magic, "gamepad\0", 8) == 0) {
-			struct gdd *gdd = gdd_create(1, 0);
-			if (gdd) {
-				gdd_set_buttons(gdd, pck.button);
-			}
+	/* start program loop */
+	INFO_MSG("starting program loop");
+	while (1) {
+		static uint16_t b_prev = 0xffff;
+		uint16_t b = 0xff00;
+
+		/* read nes, latch pulse first */
+		os_gpio_high(2);
+		os_sleepf(0.001);
+		os_gpio_low(2);
+		os_sleepf(0.001);
+
+		for (int i = 0; i < 8; i++) {
+			/* read button state */
+			b |= os_gpio_read(4) ? (1 << i) : 0;
+			/* clock pulse */
+			os_gpio_high(15);
+			os_gpio_low(15);
+		}
+		b = ~b;
+
+		// DEBUG_MSG("buttons: %02x, %s", b, sp);
+
+		if (b != b_prev) {
+			struct gamepad_packet pck;
+			memcpy(pck.magic, "gamepad\0", 8);
+			pck.button = b;
+			// pck.gamepad.buttons[1] = 0xffff;
+			// pck.gamepad.buttons[2] = 0xffff;
+			// pck.gamepad.buttons[3] = 0xffff;
+			nrf_send(&nrf, &pck);
+			b_prev = b;
+			INFO_MSG("buttons changed: %02x", b);
 		}
 
-		/* lets not waste all cpu */
 		os_sleepf(0.001);
 	}
 
-	p_exit(EXIT_SUCCESS);
 	return EXIT_SUCCESS;
 }
+

@@ -1,0 +1,13 @@
+
+# check that LIBE_PATH is set
+ifeq ($(LIBE_PATH),)
+    $(error LIBE_PATH not set)
+endif
+
+PROJECT_NAME            = controller
+EXTRA_COMPONENT_DIRS    = . $(LIBE_PATH)
+BUILD_DIR_BASE          = $(PROJECT_PATH)/.build.esp32
+
+CFLAGS += -DTARGET_ESP32 -DTARGET=ESP32
+
+include $(IDF_PATH)/make/project.mk
