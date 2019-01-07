@@ -4,28 +4,16 @@ ifeq ($(LIBE_PATH),)
     $(error LIBE_PATH not set)
 endif
 
-# detect target and do other init stuff
-include $(LIBE_PATH)/target.mk
-include $(LIBE_PATH)/source.mk
-include $(LIBE_PATH)/flags.mk
+# init
+include $(LIBE_PATH)/init.mk
 
-# source files
-daemon_SRC = main.c gdd.c cmd.c $(libe_SRC)
-
-# build binaries
-# BUILD_BINS = daemon
-BUILD_LIBS = libe
+# our own sources etc
+BUILD_BINS = gamepadd
+gamepadd_SRC = main.c gdd.c cmd.c $(libe_SRC)
 
 # compile flags
 CFLAGS += -D_GNU_SOURCE $(libe_CFLAGS)
 LDFLAGS += $(libe_LDFLAGS)
 
-$(info libe sources: $(libe_SRC))
-$(info libe use: $(libe_USE))
-$(info cflags: $(CFLAGS))
-$(info ldflags: $(LDFLAGS))
-$(info bins: $(BUILD_BINS))
-$(info libs: $(BUILD_LIBS))
-$(info $(CC_PREFIX))
-$(info )
+# build
 include $(LIBE_PATH)/build.mk

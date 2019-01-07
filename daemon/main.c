@@ -6,13 +6,17 @@
  */
 
 #include <libe/debug.h>
-#include <libe/comm.h>
+#include <libe/nrf.h>
 #include <libe/os.h>
 #include "gdd.h"
 #include "cmd.h"
+#include "config.h"
 
 
-static const char opts[] = COMMON_SHORT_OPTS "o:";
+struct spi_master master;
+struct nrf_device nrf;
+
+static const char opts[] = COMMON_SHORT_OPTS;
 static struct option longopts[] = {
 	COMMON_LONG_OPTS
 	{ 0, 0, 0, 0 },
@@ -53,8 +57,9 @@ void p_exit(int return_code)
 	if (c > 1) {
 		exit(return_code);
 	}
+	nrf_disable_radio(&nrf);
 	gdd_quit();
-	comm_quit();
+	spi_master_close(&master);
 	log_quit();
 	os_quit();
 	exit(return_code);
@@ -77,9 +82,34 @@ int p_init(int argc, char *argv[])
 	signal(SIGTERM, sig_catch_int);
 	signal(SIGTSTP, sig_catch_tstp);
 
-	/* communication initialization */
-	ERROR_IF_R(comm_init(), -1, "communication link failed to initialize");
+	/* initialize spi master */
+#ifdef USE_FTDI
+	/* open ft232h type device and try to see if it has a nrf24l01+ connected to it through mpsse-spi */
+	struct ftdi_context *context = common_ftdi_init();
+#else
+	void *context = CFG_SPI_CONTEXT;
+#endif
+	ERROR_IF_R(spi_master_open(
+	               &master, /* must give pre-allocated spi master as pointer */
+	               context, /* context depends on platform */
+	               CFG_SPI_FREQUENCY,
+	               CFG_SPI_MISO,
+	               CFG_SPI_MOSI,
+	               CFG_SPI_SCLK
+	           ), -1, "failed to open spi master");
 
+	/* nrf initialization */
+	ERROR_IF_R(nrf_open(&nrf, &master, CFG_NRF_SS, CFG_NRF_CE), -1, "nrf24l01+ failed to initialize");
+	/* change channel, default is 70 */
+	nrf_set_channel(&nrf, 17);
+	/* change speed, default is 250k */
+	nrf_set_speed(&nrf, NRF_SPEED_2M);
+	/* enable radio in listen mode */
+	nrf_mode_rx(&nrf);
+	nrf_flush_rx(&nrf);
+	nrf_enable_radio(&nrf);
+
+	/* gamepad daemon devices */
 	gdd_init();
 
 	return 0;
@@ -87,19 +117,16 @@ int p_init(int argc, char *argv[])
 
 int main(int argc, char *argv[])
 {
-	uint32_t message_ids[32];
-	int messagebuffer_cursor = 0;
-
 	/* init */
 	if (p_init(argc, argv)) {
 		ERROR_MSG("initialization failed");
 		p_exit(EXIT_FAILURE);
 	}
-	memset(message_ids, 0, sizeof(message_ids));
 
 	/* program loop */
-	DEBUG_MSG("starting main program loop");
+	INFO_MSG("starting main program loop");
 	while (1) {
+
 		// struct packet pck;
 		// int ok = comm_recv(&pck, sizeof(pck));
 		// if (ok < 0) {
