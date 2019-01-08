@@ -111,7 +111,9 @@ int main(int argc, char *argv[])
 			b |= os_gpio_read(4) ? (1 << i) : 0;
 			/* clock pulse */
 			os_gpio_high(15);
+			os_sleepf(0.001);
 			os_gpio_low(15);
+			os_sleepf(0.001);
 		}
 		b = ~b;
 
