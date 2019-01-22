@@ -73,7 +73,9 @@ void common_ftdi_list_print(void);
 /**
  * Initialize ftdi resources.
  */
-struct ftdi_context *common_ftdi_init(void);
+int common_ftdi_init(void);
+
+int common_broadcast_init(void);
 
 
 #ifdef __cplusplus

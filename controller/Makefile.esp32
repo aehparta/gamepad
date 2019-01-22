@@ -8,6 +8,6 @@ PROJECT_NAME            = controller
 EXTRA_COMPONENT_DIRS    = . $(LIBE_PATH)
 BUILD_DIR_BASE          = $(PROJECT_PATH)/.build.esp32
 
-CFLAGS += -DTARGET_ESP32 -DTARGET=ESP32
+CFLAGS += -DTARGET_ESP32 -DUSE_BROADCAST
 
 include $(IDF_PATH)/make/project.mk

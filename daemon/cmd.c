@@ -12,7 +12,9 @@
 #include <errno.h>
 #include <libe/debug.h>
 #include <libe/os.h>
+#include <libe/broadcast.h>
 #include "cmd.h"
+#include "../config.h"
 
 
 #ifdef USE_FTDI
@@ -30,6 +32,9 @@ int interface = INTERFACE_ANY;
 int reset = 0;
 #endif
 
+#ifdef USE_BROADCAST
+uint16_t broadcast_port = 0;
+#endif
 
 void common_help(int argc, char *argv[])
 {
@@ -173,12 +178,21 @@ void common_ftdi_list_print()
 }
 
 
-struct ftdi_context *common_ftdi_init(void)
+int common_ftdi_init(void)
 {
-	if (interface >= 5) {
-		return NULL;
-	}
-	return ftdi_open(usb_vid, usb_pid, interface, usb_description, usb_serial, reset);
+	/* open ft232h type device and try to see if it has a nrf24l01+ connected to it through mpsse-spi */
+	ERROR_IF_R(os_ftdi_use(OS_FTDI_GPIO_0_TO_63, usb_vid, usb_pid, usb_description, usb_serial), -1, "unable to open ftdi device for gpio 0-63");
+	os_ftdi_set_mpsse(CFG_SPI_SCLK);
+	return 0;
+}
+
+#endif
+
+#ifdef USE_BROADCAST
+
+int common_broadcast_init(void)
+{
+	return broadcast_init(broadcast_port);
 }
 
 #endif

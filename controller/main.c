@@ -11,7 +11,8 @@
 #include <math.h>
 #include <libe/os.h>
 #include <libe/debug.h>
-#include <libe/nrf.h>
+#include <libe/drivers/misc/broadcast.h>
+#include <libe/drivers/spi/nrf.h>
 #ifdef TARGET_ESP32
 #include <freertos/task.h>
 #endif
@@ -30,8 +31,10 @@ void p_exit(int return_code)
 	if (c > 1) {
 		exit(return_code);
 	}
+#ifdef USE_SPI
 	nrf_disable_radio(&nrf);
 	spi_master_close(&master);
+#endif
 	log_quit();
 	os_quit();
 	exit(return_code);
@@ -41,25 +44,24 @@ int p_init(int argc, char *argv[])
 {
 	/* very low level platform initialization */
 	os_init();
+
 	/* debug/log init */
 	log_init(NULL, 0);
 
 	/* initialize spi master */
 #ifdef USE_FTDI
-	/* open ft232h type device and try to see if it has a nrf24l01+ connected to it through mpsse-spi */
-	struct ftdi_context *context = ftdi_open(0x0403, 0x6014, 0, NULL, NULL, 1);
-#else
-	void *context = CFG_SPI_CONTEXT;
+	ERROR_IF_R(common_ftdi_init(), -1, "need to have nrf device connected to ftdi");
 #endif
+
+#ifdef USE_SPI
 	ERROR_IF_R(spi_master_open(
 	               &master, /* must give pre-allocated spi master as pointer */
-	               context, /* context depends on platform */
+	               CFG_SPI_CONTEXT, /* context depends on platform */
 	               CFG_SPI_FREQUENCY,
 	               CFG_SPI_MISO,
 	               CFG_SPI_MOSI,
 	               CFG_SPI_SCLK
 	           ), -1, "failed to open spi master");
-
 	/* nrf initialization */
 	ERROR_IF_R(nrf_open(&nrf, &master, CFG_NRF_SS, CFG_NRF_CE), -1, "nrf24l01+ failed to initialize");
 	/* change channel, default is 70 */
@@ -70,6 +72,12 @@ int p_init(int argc, char *argv[])
 	nrf_mode_rx(&nrf);
 	nrf_flush_rx(&nrf);
 	nrf_enable_radio(&nrf);
+#endif
+
+	/* initialize broadcast */
+#ifdef USE_BROADCAST
+	ERROR_IF_R(broadcast_init(0), -1, "broadcast failed to initialize");
+#endif
 
 	return 0;
 }
@@ -87,12 +95,18 @@ int main(int argc, char *argv[])
 	}
 
 	/* init nes controller */
-	os_gpio_output(15); /* clock */
-	os_gpio_low(15);
-	os_gpio_output(2); /* latch */
-	os_gpio_low(2);
-	os_gpio_input(4); /* data */
-	gpio_set_pull_mode(4, GPIO_PULLUP_ONLY);
+	os_gpio_output(GPIO_NES_CLOCK); /* clock */
+	os_gpio_low(GPIO_NES_CLOCK);
+	os_gpio_output(GPIO_NES_LATCH); /* latch */
+	os_gpio_low(GPIO_NES_LATCH);
+	os_gpio_input(GPIO_NES_INPUT); /* data */
+	// gpio_set_pull_mode(4, GPIO_PULLUP_ONLY);
+
+	os_gpio_output(18);
+	// while (1) {
+	// 	os_gpio_set(18, os_gpio_read(GPIO_NES_INPUT) ? 1 : 0);
+	// 	os_delay_us(500);
+	// }
 
 	/* start program loop */
 	INFO_MSG("starting program loop");
@@ -101,19 +115,19 @@ int main(int argc, char *argv[])
 		uint16_t b = 0xff00;
 
 		/* read nes, latch pulse first */
-		os_gpio_high(2);
-		os_sleepf(0.001);
-		os_gpio_low(2);
-		os_sleepf(0.001);
+		os_gpio_high(GPIO_NES_LATCH);
+		os_delay_us(10);
+		os_gpio_low(GPIO_NES_LATCH);
+		os_delay_us(10);
 
 		for (int i = 0; i < 8; i++) {
 			/* read button state */
-			b |= os_gpio_read(4) ? (1 << i) : 0;
+			b |= os_gpio_read(GPIO_NES_INPUT) << i;
 			/* clock pulse */
-			os_gpio_high(15);
-			os_sleepf(0.001);
-			os_gpio_low(15);
-			os_sleepf(0.001);
+			os_gpio_high(GPIO_NES_CLOCK);
+			os_delay_us(10);
+			os_gpio_low(GPIO_NES_CLOCK);
+			os_delay_us(10);
 		}
 		b = ~b;
 
@@ -126,12 +140,19 @@ int main(int argc, char *argv[])
 			// pck.gamepad.buttons[1] = 0xffff;
 			// pck.gamepad.buttons[2] = 0xffff;
 			// pck.gamepad.buttons[3] = 0xffff;
+#ifdef USE_SPI
 			nrf_send(&nrf, &pck);
+			os_delay_us(100);
+			nrf_send(&nrf, &pck);
+#endif
 			b_prev = b;
 			INFO_MSG("buttons changed: %02x", b);
+			if (b & 1) {
+				os_gpio_high(18);
+			} else {
+				os_gpio_low(18);
+			}
 		}
-
-		os_sleepf(0.001);
 	}
 
 	return EXIT_SUCCESS;

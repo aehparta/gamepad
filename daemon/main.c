@@ -6,8 +6,8 @@
  */
 
 #include <libe/debug.h>
-#include <libe/nrf.h>
 #include <libe/os.h>
+#include <libe/drivers/spi/nrf.h>
 #include "gdd.h"
 #include "cmd.h"
 #include "../config.h"
@@ -85,14 +85,11 @@ int p_init(int argc, char *argv[])
 
 	/* initialize spi master */
 #ifdef USE_FTDI
-	/* open ft232h type device and try to see if it has a nrf24l01+ connected to it through mpsse-spi */
-	struct ftdi_context *context = common_ftdi_init();
-#else
-	void *context = CFG_SPI_CONTEXT;
+	ERROR_IF_R(common_ftdi_init(), -1, "need to have nrf device connected to ftdi");
 #endif
 	ERROR_IF_R(spi_master_open(
 	               &master, /* must give pre-allocated spi master as pointer */
-	               context, /* context depends on platform */
+	               CFG_SPI_CONTEXT, /* context depends on platform */
 	               CFG_SPI_FREQUENCY,
 	               CFG_SPI_MISO,
 	               CFG_SPI_MOSI,
@@ -109,6 +106,11 @@ int p_init(int argc, char *argv[])
 	nrf_mode_rx(&nrf);
 	nrf_flush_rx(&nrf);
 	nrf_enable_radio(&nrf);
+
+	/* initialize broadcast */
+#ifdef USE_BROADCAST
+	ERROR_IF_R(broadcast_init(0), -1, "broadcast failed to initialize");
+#endif
 
 	/* gamepad daemon devices */
 	gdd_init();
