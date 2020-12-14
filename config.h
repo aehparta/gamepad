@@ -35,18 +35,19 @@
 
 #ifdef TARGET_PIC8
 /* mcu configuration */
-#pragma config WDTE = OFF
-#pragma config PWRTE = ON
+// #pragma config LVP = OFF
+// #pragma config WDTE = OFF
+// #pragma config PWRTE = ON
 /* spi */
 #define CFG_SPI_CONTEXT     NULL
 #define CFG_SPI_FREQUENCY   0
-#define CFG_SPI_MISO        2
-#define CFG_SPI_MOSI        1
-#define CFG_SPI_SCLK        0
-#define CFG_NRF_SS          3
+#define CFG_SPI_MISO        17
+#define CFG_SPI_MOSI        18
+#define CFG_SPI_SCLK        16
+#define CFG_NRF_SS          19
 #define CFG_NRF_CE          4
 /* nes controller */
-#define GPIO_NES_CLOCK      19
-#define GPIO_NES_LATCH      20
-#define GPIO_NES_INPUT      21
+#define GPIO_NES_CLOCK      0
+#define GPIO_NES_LATCH      1
+#define GPIO_NES_INPUT      5
 #endif

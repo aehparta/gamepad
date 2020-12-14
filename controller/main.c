@@ -10,12 +10,9 @@
 #include <string.h>
 #include <math.h>
 #include <libe/os.h>
-#include <libe/debug.h>
+#include <libe/log.h>
 #include <libe/drivers/misc/broadcast.h>
 #include <libe/drivers/spi/nrf.h>
-#ifdef TARGET_ESP32
-#include <freertos/task.h>
-#endif
 #include "../gamepad.h"
 #include "../config.h"
 
@@ -47,6 +44,19 @@ int p_init(int argc, char *argv[])
 
 	/* debug/log init */
 	log_init(NULL, 0);
+
+	os_gpio_output(18);
+	// os_gpio_high(18);
+	// while(1);
+	os_gpio_input(17);
+	while (1) {
+		if (os_gpio_read(17)) {
+			os_gpio_low(18);
+		} else {
+			os_gpio_high(18);
+		}
+		// os_delay_ms(300);
+	}
 
 	/* initialize spi master */
 #ifdef USE_FTDI
@@ -100,12 +110,14 @@ int main(int argc, char *argv[])
 	os_gpio_output(GPIO_NES_LATCH); /* latch */
 	os_gpio_low(GPIO_NES_LATCH);
 	os_gpio_input(GPIO_NES_INPUT); /* data */
-	// gpio_set_pull_mode(4, GPIO_PULLUP_ONLY);
 
-	os_gpio_output(18);
 	// while (1) {
-	// 	os_gpio_set(18, os_gpio_read(GPIO_NES_INPUT) ? 1 : 0);
-	// 	os_delay_us(500);
+	// 	os_gpio_high(GPIO_NES_CLOCK);
+	// 	os_gpio_high(GPIO_NES_LATCH);
+	// 	os_delay_ms(300);
+	// 	os_gpio_low(GPIO_NES_CLOCK);
+	// 	os_gpio_low(GPIO_NES_LATCH);
+	// 	os_delay_ms(300);
 	// }
 
 	/* start program loop */
@@ -130,9 +142,9 @@ int main(int argc, char *argv[])
 			os_delay_us(10);
 		}
 		b = ~b;
+		printf("buttons: %02x\r\n", b);
 
-		// DEBUG_MSG("buttons: %02x, %s", b, sp);
-
+		/* send only if changed */
 		if (b != b_prev) {
 			struct gamepad_packet pck;
 			memcpy(pck.magic, "gamepad\0", 8);
@@ -140,18 +152,13 @@ int main(int argc, char *argv[])
 			// pck.gamepad.buttons[1] = 0xffff;
 			// pck.gamepad.buttons[2] = 0xffff;
 			// pck.gamepad.buttons[3] = 0xffff;
-#ifdef USE_SPI
-			nrf_send(&nrf, &pck);
-			os_delay_us(100);
-			nrf_send(&nrf, &pck);
-#endif
+// #ifdef USE_SPI
+// 			nrf_send(&nrf, &pck);
+// 			os_delay_us(100);
+// 			nrf_send(&nrf, &pck);
+// #endif
 			b_prev = b;
-			INFO_MSG("buttons changed: %02x", b);
-			if (b & 1) {
-				os_gpio_high(18);
-			} else {
-				os_gpio_low(18);
-			}
+			printf("buttons changed: %02x\r\n", b);
 		}
 	}
 

@@ -10,7 +10,7 @@
 #include <string.h>
 #include <libgen.h>
 #include <errno.h>
-#include <libe/debug.h>
+#include <libe/log.h>
 #include <libe/os.h>
 #include <libe/broadcast.h>
 #include "cmd.h"

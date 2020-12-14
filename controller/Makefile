@@ -4,6 +4,8 @@ ifeq ($(LIBE_PATH),)
     $(error LIBE_PATH not set)
 endif
 
+libe_USE += SPI
+
 # init
 include $(LIBE_PATH)/init.mk
 

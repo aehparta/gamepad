@@ -5,7 +5,7 @@
  *  Antti Partanen <aehparta@iki.fi>
  */
 
-#include <libe/debug.h>
+#include <libe/log.h>
 #include <libe/os.h>
 #include <libe/drivers/spi/nrf.h>
 #include "gdd.h"

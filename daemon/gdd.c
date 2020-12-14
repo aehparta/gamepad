@@ -12,7 +12,7 @@
 #include <fcntl.h>
 #include <string.h>
 #include <linux/uinput.h>
-#include <libe/debug.h>
+#include <libe/log.h>
 #include <libe/linkedlist.h>
 #include "gdd.h"
 
