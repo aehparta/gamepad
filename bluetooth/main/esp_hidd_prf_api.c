@@ -84,9 +84,9 @@ void esp_hidd_send_joystick_value(uint16_t conn_id, uint16_t joystick_buttons, u
 	buffer[0] = joystick_buttons & 0xff;
 	buffer[1] = joystick_buttons >> 8;
 	buffer[2] = joystick_x ^ 0x80;
-	buffer[3] = ((joystick_y ^ 0x80) * -1) - 1;
+	buffer[3] = joystick_y ^ 0x80;
 	buffer[4] = joystick_z ^ 0x80;
-	buffer[5] = ((joystick_rx ^ 0x80) * -1) - 1;
+	buffer[5] = joystick_rx ^ 0x80;
 
 	hid_dev_send_report(hidd_le_env.gatt_if, conn_id, HID_RPT_ID_MOUSE_IN, HID_REPORT_TYPE_INPUT, sizeof(buffer), buffer);
 }

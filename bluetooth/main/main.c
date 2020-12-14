@@ -40,6 +40,10 @@
 #define DEVICE_NAME         "Old gamepad/joystick adapter"
 #define LOG_TAG             "joystick"
 
+#define NES_CLOCK           18
+#define NES_LATCH           19
+#define NES_DATA            21
+
 
 static uint16_t hid_conn_id = 0;
 static bool sec_conn = false;
@@ -60,7 +64,7 @@ static esp_ble_adv_data_t hidd_adv_data = {
 	.include_txpower = true,
 	.min_interval = 0x0006, //slave connection min interval, Time = min_interval * 1.25 msec
 	.max_interval = 0x0010, //slave connection max interval, Time = max_interval * 1.25 msec
-	.appearance = 0x03c0,       //HID Generic,
+	.appearance = 0x03c4, /* gamepad */
 	.manufacturer_len = 0,
 	.p_manufacturer_data =  NULL,
 	.service_data_len = 0,
@@ -225,13 +229,57 @@ void app_main(void)
 	gpio_set_pull_mode(14, GPIO_PULLUP_ONLY);
 
 
+	gpio_set_direction(NES_CLOCK, GPIO_MODE_OUTPUT);
+	gpio_set_level(NES_CLOCK, 0);
+	gpio_set_direction(NES_LATCH, GPIO_MODE_OUTPUT);
+	gpio_set_level(NES_LATCH, 0);
+	gpio_set_direction(NES_DATA, GPIO_MODE_INPUT);
+	gpio_set_pull_mode(NES_DATA, GPIO_PULLUP_ONLY);
+
+
 	while (true) {
 		static uint16_t btns_last = 0;
 		static uint32_t js_last = 0;
 		uint16_t btns = 0;
-		uint8_t js1x = 0, js1y = 0, js2x = 0, js2y = 0;
+		uint8_t js1x = 0x80, js1y = 0x80, js2x = 0x80, js2y = 0x80;
 
-		btns = gpio_get_level(14);
+
+
+		/* read nes */
+		gpio_set_level(NES_LATCH, 1);
+		vTaskDelay(1);
+		gpio_set_level(NES_LATCH, 0);
+		vTaskDelay(1);
+		for (int i = 0; i < 8; i++) {
+			/* read button state */
+			btns |= gpio_get_level(NES_DATA) << i;
+			/* clock pulse */
+			gpio_set_level(NES_CLOCK, 1);
+			vTaskDelay(1);
+			gpio_set_level(NES_CLOCK, 0);
+			vTaskDelay(1);
+		}
+		btns = ~btns;
+
+		/* convert upper buttons to joystick values */
+		if (btns & 0x10) {
+			js1x = 0xff;
+		} else if (btns & 0x20) {
+			js1x = 0x00;
+		} else {
+			js1x = 0x80;
+		}
+		if (btns & 0x80) {
+			js1y = 0xff;
+		} else if (btns & 0x40) {
+			js1y = 0x00;
+		} else {
+			js1y = 0x80;
+		}
+
+		/* clear btns to show only buttons */
+		btns &= 0x000f;
+
 
 		/* only transmit if something changed */
 		if (btns != btns_last || js_last != ((js2x << 24) | (js2y << 16) | (js1x << 8) | js1y)) {
