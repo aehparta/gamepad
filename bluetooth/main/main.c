@@ -247,17 +247,17 @@ void app_main(void)
 
 		/* read nes */
 		gpio_set_level(NES_LATCH, 1);
-		vTaskDelay(1);
+		ets_delay_us(10);
 		gpio_set_level(NES_LATCH, 0);
-		vTaskDelay(1);
+		ets_delay_us(5);
 		for (int i = 0; i < 8; i++) {
 			/* read button state */
 			btns |= gpio_get_level(NES_DATA) << i;
 			/* clock pulse */
 			gpio_set_level(NES_CLOCK, 1);
-			vTaskDelay(1);
+			ets_delay_us(5);
 			gpio_set_level(NES_CLOCK, 0);
-			vTaskDelay(1);
+			ets_delay_us(5);
 		}
 		btns = ~btns;
 
