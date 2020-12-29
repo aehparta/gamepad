@@ -44,6 +44,8 @@
 #define NES_LATCH           19
 #define NES_DATA            21
 
+#define BUTTON              0
+
 
 static uint16_t hid_conn_id = 0;
 static bool sec_conn = false;
@@ -184,12 +186,19 @@ int p_init(void)
 		return -1;
 	}
 
+	return 0;
+}
+
+int bt_connect(void)
+{
+	// esp_bluedroid_disable();
+
 	if (esp_bluedroid_enable()) {
 		ESP_LOGE(LOG_TAG, "init bluedroid failed");
 		return -1;
 	}
 
-	if ((ret = esp_hidd_profile_init()) != ESP_OK) {
+	if (esp_hidd_profile_init() != ESP_OK) {
 		ESP_LOGE(LOG_TAG, "init bluedroid failed");
 		return -1;
 	}
@@ -223,10 +232,13 @@ void app_main(void)
 		ESP_LOGE(LOG_TAG, "app initialization failed");
 		return;
 	}
+	if (bt_connect()) {
+		ESP_LOGE(LOG_TAG, "bt connect failed");
+		return;
+	}
 
-
-	gpio_set_direction(14, GPIO_MODE_INPUT);
-	gpio_set_pull_mode(14, GPIO_PULLUP_ONLY);
+	gpio_set_direction(BUTTON, GPIO_MODE_INPUT);
+	gpio_set_pull_mode(BUTTON, GPIO_PULLUP_ONLY);
 
 
 	gpio_set_direction(NES_CLOCK, GPIO_MODE_OUTPUT);
@@ -240,6 +252,7 @@ void app_main(void)
 	while (true) {
 		static uint16_t btns_last = 0;
 		static uint32_t js_last = 0;
+		static int send_count = 0;
 		uint16_t btns = 0;
 		uint8_t js1x = 0x80, js1y = 0x80, js2x = 0x80, js2y = 0x80;
 
@@ -283,13 +296,20 @@ void app_main(void)
 
 		/* only transmit if something changed */
 		if (btns != btns_last || js_last != ((js2x << 24) | (js2y << 16) | (js1x << 8) | js1y)) {
+			send_count = 3;
+		}
+		if (send_count > 0) {
 			ESP_LOGI(LOG_TAG, "send buttons %d JS1 X=%d Y=%d JS2 X=%d Y=%d", btns, js1x, js1y, js2x, js2y);
 			esp_hidd_send_joystick_value(hid_conn_id, btns, js1x, js1y, js2x, js2y);
+			send_count--;
 		}
 
 		/* used to detect state changes which trigger sending a packet */
 		btns_last = btns;
 		js_last = ((js2x << 24) | (js2y << 16) | (js1x << 8) | js1y);
+
+
+		// ESP_LOGI(LOG_TAG, "btn: %u", gpio_get_level(BUTTON));
 
 		vTaskDelay(1);
 	}
