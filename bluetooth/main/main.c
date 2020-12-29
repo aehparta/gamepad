@@ -40,9 +40,9 @@
 #define DEVICE_NAME         "Old gamepad/joystick adapter"
 #define LOG_TAG             "joystick"
 
-#define NES_CLOCK           18
-#define NES_LATCH           19
-#define NES_DATA            21
+#define NES_CLOCK           32
+#define NES_LATCH           33
+#define NES_DATA            27
 
 
 static uint16_t hid_conn_id = 0;
@@ -225,8 +225,8 @@ void app_main(void)
 	}
 
 
-	gpio_set_direction(14, GPIO_MODE_INPUT);
-	gpio_set_pull_mode(14, GPIO_PULLUP_ONLY);
+	// gpio_set_direction(14, GPIO_MODE_INPUT);
+	// gpio_set_pull_mode(14, GPIO_PULLUP_ONLY);
 
 
 	gpio_set_direction(NES_CLOCK, GPIO_MODE_OUTPUT);
