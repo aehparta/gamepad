@@ -46,6 +46,10 @@
 
 #define BUTTON              26
 
+#define LED_R               13
+#define LED_G               14
+#define LED_B               12
+
 
 static uint16_t hid_conn_id = 0;
 static bool sec_conn = false;
@@ -170,6 +174,11 @@ int p_init(void)
 
 	ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT));
 
+	return 0;
+}
+
+int bt_init(void)
+{
 	esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
 	if (esp_bt_controller_init(&bt_cfg)) {
 		ESP_LOGE(LOG_TAG, "initialize controller failed");
@@ -189,10 +198,17 @@ int p_init(void)
 	return 0;
 }
 
+void bt_disconnect(void)
+{
+	esp_bluedroid_disable();
+	esp_bluedroid_deinit();
+	esp_bt_controller_disable();
+	esp_bt_controller_deinit();
+	esp_bt_mem_release(ESP_BT_MODE_BTDM);
+}
+
 int bt_connect(void)
 {
-	// esp_bluedroid_disable();
-
 	if (esp_bluedroid_enable()) {
 		ESP_LOGE(LOG_TAG, "init bluedroid failed");
 		return -1;
@@ -232,14 +248,48 @@ void app_main(void)
 		ESP_LOGE(LOG_TAG, "app initialization failed");
 		return;
 	}
+	if (bt_init()) {
+		ESP_LOGE(LOG_TAG, "bt init failed");
+		return;
+	}
 	if (bt_connect()) {
 		ESP_LOGE(LOG_TAG, "bt connect failed");
 		return;
 	}
 
+	/* rgb-led */
+	gpio_reset_pin(LED_R);
+	gpio_reset_pin(LED_G);
+	gpio_reset_pin(LED_B);
+	gpio_set_pull_mode(LED_R, GPIO_FLOATING);
+	gpio_set_pull_mode(LED_G, GPIO_FLOATING);
+	gpio_set_pull_mode(LED_B, GPIO_FLOATING);
+	gpio_set_direction(LED_R, GPIO_MODE_OUTPUT);
+	gpio_set_direction(LED_G, GPIO_MODE_OUTPUT);
+	gpio_set_direction(LED_B, GPIO_MODE_OUTPUT);
+	gpio_set_level(LED_R, 0);
+	gpio_set_level(LED_G, 0);
+	gpio_set_level(LED_B, 0);
+
+	/* flash each for to indicate boot */
+	gpio_set_level(LED_R, 1);
+	vTaskDelay(300 / portTICK_PERIOD_MS);
+	gpio_set_level(LED_R, 0);
+	gpio_set_level(LED_G, 1);
+	vTaskDelay(300 / portTICK_PERIOD_MS);
+	gpio_set_level(LED_G, 0);
+	gpio_set_level(LED_B, 1);
+	vTaskDelay(300 / portTICK_PERIOD_MS);
+	gpio_set_level(LED_B, 0);
+
+
+	/* single button */
 	gpio_set_direction(BUTTON, GPIO_MODE_INPUT);
 	gpio_set_pull_mode(BUTTON, GPIO_PULLUP_ONLY);
 
+	/* nes/snes controller gpio */
+	gpio_set_pull_mode(NES_CLOCK, GPIO_FLOATING);
+	gpio_set_pull_mode(NES_LATCH, GPIO_FLOATING);
 	gpio_set_direction(NES_CLOCK, GPIO_MODE_OUTPUT);
 	gpio_set_level(NES_CLOCK, 0);
 	gpio_set_direction(NES_LATCH, GPIO_MODE_OUTPUT);
@@ -251,11 +301,9 @@ void app_main(void)
 	while (true) {
 		static uint16_t btns_last = 0;
 		static uint32_t js_last = 0;
-		static int send_count = 0;
+		static int send_count = 0, timering = 0;
 		uint16_t btns = 0;
 		uint8_t js1x = 0x80, js1y = 0x80, js2x = 0x80, js2y = 0x80;
-
-
 
 		/* read nes */
 		gpio_set_level(NES_LATCH, 1);
@@ -307,8 +355,32 @@ void app_main(void)
 		btns_last = btns;
 		js_last = ((js2x << 24) | (js2y << 16) | (js1x << 8) | js1y);
 
+		/* very simple dummy timer thingie */
+		if (timering > 250) {
+			static bool toggle = 0;
+			static int btn_down = 0;
 
-		// ESP_LOGI(LOG_TAG, "btn: %u", gpio_get_level(BUTTON));
+			/* blue led on when connected, blinking when not */
+			if (connected) {
+				gpio_set_level(LED_B, 1);
+			} else {
+				gpio_set_level(LED_B, toggle);
+				toggle = !toggle;
+			}
+
+			/* if button is down long enough, disconnect if connected or trying to connect */
+			if (btn_down > 8 && connected) {
+				/* TODO */
+				// ESP_LOGI(LOG_TAG, "disconnecting by user request");
+			} else if (!gpio_get_level(BUTTON)) {
+				btn_down++;
+			} else {
+				btn_down = 0;
+			}
+
+			timering = 0;
+		}
+		timering++;
 
 		vTaskDelay(1);
 	}
